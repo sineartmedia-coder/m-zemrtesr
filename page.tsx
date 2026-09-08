@@ -302,9 +302,9 @@ export default function Home() {
       {!isMobile && <div className="status"><span /> SERGİ AÇIK <b>/</b> 7 GALERİ · 49 ESER</div>}
       {!isMobile && <div className="key-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>HAREKET</span><i /><kbd>⇧</kbd><span>HIZLI YÜRÜ</span><i />FARE<span>BAKIŞ</span></div>}
       {isMobile && (
-        <nav style={{display:"flex",flexDirection:"column",gap:"14px",position:"absolute",zIndex:8,left:"14px",top:"50%",transform:"translateY(-50%)",touchAction:"none"}} aria-label="Hareket kontrolleri">
-          <button style={{width:"64px",height:"64px",border:"2px solid rgba(255,255,255,0.45)",borderRadius:"50%",background:"rgba(0,0,0,0.25)",color:"rgba(255,255,255,0.9)",fontSize:"26px",display:"flex",alignItems:"center",justifyContent:"center",touchAction:"none",backdropFilter:"blur(6px)"}} onPointerDown={()=>hold("w",true)} onPointerUp={()=>hold("w",false)} onPointerLeave={()=>hold("w",false)} onPointerCancel={()=>hold("w",false)}>▲</button>
-          <button style={{width:"64px",height:"64px",border:"2px solid rgba(255,255,255,0.45)",borderRadius:"50%",background:"rgba(0,0,0,0.25)",color:"rgba(255,255,255,0.9)",fontSize:"26px",display:"flex",alignItems:"center",justifyContent:"center",touchAction:"none",backdropFilter:"blur(6px)"}} onPointerDown={()=>hold("s",true)} onPointerUp={()=>hold("s",false)} onPointerLeave={()=>hold("s",false)} onPointerCancel={()=>hold("s",false)}>▼</button>
+        <nav className="mobile-controls" aria-label="Hareket kontrolleri">
+          <button className="mob-fwd" aria-label="İleri git" onPointerDown={()=>hold("w",true)} onPointerUp={()=>hold("w",false)} onPointerLeave={()=>hold("w",false)} onPointerCancel={()=>hold("w",false)}>▲</button>
+          <button className="mob-bwd" aria-label="Geri git" onPointerDown={()=>hold("s",true)} onPointerUp={()=>hold("s",false)} onPointerLeave={()=>hold("s",false)} onPointerCancel={()=>hold("s",false)}>▼</button>
         </nav>
       )}
       {!entered && (
