@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPalace } from "./palace";
@@ -57,11 +57,11 @@ export default function Home() {
     camera.position.set(0, 1.72, 29);
     camera.rotation.order = "YXZ";
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     const mobileRenderer = window.matchMedia("(pointer: coarse), (hover: none), (max-width: 1100px)").matches;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobileRenderer ? 1.1 : 1.6));
+    const renderer = new THREE.WebGLRenderer({ antialias: !mobileRenderer, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobileRenderer ? .8 : 1.6));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
-    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.enabled = !mobileRenderer;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -199,7 +199,7 @@ export default function Home() {
       });
     }
     const updateMobileLights = () => {
-      const maxDistanceSq = 24 * 24;
+      const maxDistanceSq = 14 * 14;
       mobileLights.forEach((light) => {
         light.visible = light.position.distanceToSquared(camera.position) <= maxDistanceSq;
       });
@@ -272,7 +272,7 @@ export default function Home() {
       zoneTimer += dt;
       if (zoneTimer > .35) { zoneTimer = 0; setZone(getZone(camera.position.x, camera.position.z)); }
       lightTimer += dt;
-      if (lightTimer > .25) { lightTimer = 0; updateMobileLights(); }
+      if (lightTimer > .5) { lightTimer = 0; updateMobileLights(); }
       renderer.render(scene, camera);
     };
     // The architecture is static, so preserve its shadows without recalculating them every frame.
@@ -315,6 +315,14 @@ export default function Home() {
     if (active) keys.current.add(key);
     else keys.current.delete(key);
   };
+  const stopMobileMove = () => {
+    ["w", "a", "s", "d"].forEach((key) => keys.current.delete(key));
+  };
+  const startMobileMove = (key: string, event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hold(key, true);
+  };
 
   return (
     <main className="museum-game">
@@ -325,11 +333,11 @@ export default function Home() {
       <div className="crosshair"><i /></div>
       <div className="status"><span /> SERGİ AÇIK <b>/</b> 7 GALERİ · 49 ESER</div>
       <div className="key-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>HAREKET</span><i /><kbd>⇧</kbd><span>HIZLI YÜRÜ</span><i />FARE<span>BAKIŞ</span></div>
-      <nav className="mobile-controls" aria-label="Hareket kontrolleri" onContextMenu={(event) => event.preventDefault()}>
-        <button className="mob-move mob-up" aria-label="İleri git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("w", true); }} onPointerUp={() => hold("w", false)} onPointerLeave={() => hold("w", false)} onPointerCancel={() => hold("w", false)} onLostPointerCapture={() => hold("w", false)}>▲</button>
-        <button className="mob-move mob-left" aria-label="Sola git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("a", true); }} onPointerUp={() => hold("a", false)} onPointerLeave={() => hold("a", false)} onPointerCancel={() => hold("a", false)} onLostPointerCapture={() => hold("a", false)}>◀</button>
-        <button className="mob-move mob-down" aria-label="Geri git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("s", true); }} onPointerUp={() => hold("s", false)} onPointerLeave={() => hold("s", false)} onPointerCancel={() => hold("s", false)} onLostPointerCapture={() => hold("s", false)}>▼</button>
-        <button className="mob-move mob-right" aria-label="Sağa git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("d", true); }} onPointerUp={() => hold("d", false)} onPointerLeave={() => hold("d", false)} onPointerCancel={() => hold("d", false)} onLostPointerCapture={() => hold("d", false)}>▶</button>
+      <nav className="mobile-controls" aria-label="Hareket kontrolleri" onContextMenu={(event) => event.preventDefault()} onPointerUp={stopMobileMove} onPointerCancel={stopMobileMove}>
+        <button className="mob-move mob-up" aria-label="İleri git" onPointerDown={(event) => startMobileMove("w", event)}>▲</button>
+        <button className="mob-move mob-left" aria-label="Sola git" onPointerDown={(event) => startMobileMove("a", event)}>◀</button>
+        <button className="mob-move mob-down" aria-label="Geri git" onPointerDown={(event) => startMobileMove("s", event)}>▼</button>
+        <button className="mob-move mob-right" aria-label="Sağa git" onPointerDown={(event) => startMobileMove("d", event)}>▶</button>
       </nav>
       {entered && !locked && <button className="resume" onClick={() => canvasRef.current?.requestPointerLock()?.catch(() => {})}>FARE KONTROLÜNÜ AÇ</button>}
       {!entered && (
@@ -918,7 +926,7 @@ function addLabel(scene: THREE.Scene, text: string, x: number, y: number, z: num
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   if (goldStyle) {
-    // A large, luminous gold inscription that feels painted into the wall.
+    // A large matte gold inscription painted directly into the wall.
     const textSize = text.length > 16 ? 118 : 154;
     const goldGradient = ctx.createLinearGradient(0, 0, 0, 440);
     goldGradient.addColorStop(0, "#fff3bd");
@@ -929,14 +937,9 @@ function addLabel(scene: THREE.Scene, text: string, x: number, y: number, z: num
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.lineWidth = 6;
     ctx.strokeStyle = "#5e3515";
-    ctx.shadowColor = "rgba(255, 204, 93, .82)";
-    ctx.shadowBlur = 34;
     ctx.strokeText(text, 800, 224);
     ctx.fillStyle = goldGradient;
     ctx.fillText(text, 800, 224);
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "rgba(255, 245, 194, .56)";
-    ctx.fillText(text, 800, 217);
   } else {
     ctx.fillStyle = "rgba(20,16,12,.93)";
     ctx.fillRect(0, 0, 1024, 220);
