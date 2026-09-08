@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/postcss';
 import { copyFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
@@ -10,7 +11,7 @@ function copyDir(src: string, dest: string) {
     const s = join(src, item), d = join(dest, item);
     try {
       statSync(s).isDirectory() ? copyDir(s, d) : copyFileSync(s, d);
-    } catch { /* skip missing */ }
+    } catch (e) { /* skip missing */ }
   }
 }
 
@@ -25,17 +26,23 @@ export default defineConfig({
       closeBundle() {
         try {
           copyDir('museum', 'dist-vercel/museum');
-          console.log('✅ museum/ assets copied to dist-vercel/museum/');
+          console.log('museum/ assets copied to dist-vercel/museum/');
         } catch (e) {
-          console.warn('⚠️  Could not copy museum/ folder:', e);
+          console.warn('Could not copy museum/ folder:', e);
         }
       }
     }
   ],
+  css: {
+    postcss: {
+      plugins: [tailwindcss()],
+    },
+  },
   root: '.',
   build: {
     outDir: 'dist-vercel',
     emptyOutDir: true,
   },
 });
+
 
