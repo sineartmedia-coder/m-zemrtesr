@@ -301,12 +301,8 @@ export default function Home() {
       <div className="status"><span /> SERGİ AÇIK <b>/</b> 7 GALERİ · 49 ESER</div>
       <div className="key-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>HAREKET</span><i /><kbd>⇧</kbd><span>HIZLI YÜRÜ</span><i />FARE<span>BAKIŞ</span></div>
       <nav className="mobile-controls" aria-label="Hareket kontrolleri">
-        <button onPointerDown={() => hold("w", true)} onPointerUp={() => hold("w", false)} onPointerLeave={() => hold("w", false)}>↑</button>
-        <div>
-          <button onPointerDown={() => hold("a", true)} onPointerUp={() => hold("a", false)}>←</button>
-          <button onPointerDown={() => hold("s", true)} onPointerUp={() => hold("s", false)}>↓</button>
-          <button onPointerDown={() => hold("d", true)} onPointerUp={() => hold("d", false)}>→</button>
-        </div>
+        <button className="mob-fwd" aria-label="İleri git" onPointerDown={() => hold("w", true)} onPointerUp={() => hold("w", false)} onPointerLeave={() => hold("w", false)} onPointerCancel={() => hold("w", false)}>▲</button>
+        <button className="mob-bwd" aria-label="Geri git" onPointerDown={() => hold("s", true)} onPointerUp={() => hold("s", false)} onPointerLeave={() => hold("s", false)} onPointerCancel={() => hold("s", false)}>▼</button>
       </nav>
       {entered && !locked && <button className="resume" onClick={() => canvasRef.current?.requestPointerLock()?.catch(() => {})}>FARE KONTROLÜNÜ AÇ</button>}
       {!entered && (
