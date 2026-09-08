@@ -61,7 +61,7 @@ export default function Home() {
     camera.rotation.order = "YXZ";
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    const mobileRenderer = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 860;
+    const mobileRenderer = window.matchMedia("(pointer: coarse), (hover: none), (max-width: 1100px)").matches;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobileRenderer ? 1.1 : 1.6));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.shadowMap.enabled = true;
