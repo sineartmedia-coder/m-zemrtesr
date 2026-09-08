@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPalace } from "./palace";
@@ -37,9 +37,6 @@ export default function Home() {
   const mountRef  = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keys      = useRef(new Set<string>());
-  const mobileAxis = useRef({ forward: 0, strafe: 0 });
-  const joystickKnobRef = useRef<HTMLSpanElement>(null);
-  const joystickPointerId = useRef<number | null>(null);
   const [entered, setEntered] = useState(false);
   const [locked,  setLocked]  = useState(false);
   const [zone,    setZone]    = useState("GİRİŞ");
@@ -260,11 +257,9 @@ export default function Home() {
         if (keys.current.has("s") || keys.current.has("arrowdown"))  fw -= 1;
         if (keys.current.has("d") || keys.current.has("arrowright")) st += 1;
         if (keys.current.has("a") || keys.current.has("arrowleft"))  st -= 1;
-        fw += mobileAxis.current.forward;
-        st += mobileAxis.current.strafe;
         if (fw || st) {
           const len = Math.hypot(fw, st);
-          const spd = (keys.current.has("shift") ? 10.2 : 7.4) * dt * Math.min(1, len);
+          const spd = (keys.current.has("shift") ? 10.2 : 7.4) * dt;
           const nx = camera.position.x + (-Math.sin(yaw) * fw / len + Math.cos(yaw) * st / len) * spd;
           const nz = camera.position.z + (-Math.cos(yaw) * fw / len - Math.sin(yaw) * st / len) * spd;
           if (isWalkable(nx, camera.position.z)) camera.position.x = nx;
@@ -316,35 +311,9 @@ export default function Home() {
     setEntered(true);
     if (window.matchMedia("(pointer: fine)").matches) canvasRef.current?.requestPointerLock()?.catch(() => {});
   };
-  const resetJoystick = () => {
-    mobileAxis.current = { forward: 0, strafe: 0 };
-    joystickKnobRef.current?.style.setProperty("transform", "translate(-50%, -50%)");
-  };
-  const updateJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const limit = 34;
-    let x = event.clientX - (bounds.left + bounds.width / 2);
-    let y = event.clientY - (bounds.top + bounds.height / 2);
-    const distance = Math.hypot(x, y);
-    if (distance > limit) { x = (x / distance) * limit; y = (y / distance) * limit; }
-    mobileAxis.current = { forward: -y / limit, strafe: x / limit };
-    joystickKnobRef.current?.style.setProperty("transform", `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`);
-  };
-  const startJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    joystickPointerId.current = event.pointerId;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    updateJoystick(event);
-  };
-  const moveJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerId !== joystickPointerId.current) return;
-    event.preventDefault();
-    updateJoystick(event);
-  };
-  const stopJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.pointerId !== joystickPointerId.current) return;
-    joystickPointerId.current = null;
-    resetJoystick();
+  const hold = (key: string, active: boolean) => {
+    if (active) keys.current.add(key);
+    else keys.current.delete(key);
   };
 
   return (
@@ -356,9 +325,12 @@ export default function Home() {
       <div className="crosshair"><i /></div>
       <div className="status"><span /> SERGİ AÇIK <b>/</b> 7 GALERİ · 49 ESER</div>
       <div className="key-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>HAREKET</span><i /><kbd>⇧</kbd><span>HIZLI YÜRÜ</span><i />FARE<span>BAKIŞ</span></div>
-      <div className="mobile-controls" role="group" aria-label="Hareket joystick'i" onContextMenu={(event) => event.preventDefault()} onPointerDown={startJoystick} onPointerMove={moveJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} onLostPointerCapture={resetJoystick}>
-        <span ref={joystickKnobRef} className="joystick-knob" />
-      </div>
+      <nav className="mobile-controls" aria-label="Hareket kontrolleri" onContextMenu={(event) => event.preventDefault()}>
+        <button className="mob-move mob-up" aria-label="İleri git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("w", true); }} onPointerUp={() => hold("w", false)} onPointerLeave={() => hold("w", false)} onPointerCancel={() => hold("w", false)} onLostPointerCapture={() => hold("w", false)}>▲</button>
+        <button className="mob-move mob-left" aria-label="Sola git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("a", true); }} onPointerUp={() => hold("a", false)} onPointerLeave={() => hold("a", false)} onPointerCancel={() => hold("a", false)} onLostPointerCapture={() => hold("a", false)}>◀</button>
+        <button className="mob-move mob-down" aria-label="Geri git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("s", true); }} onPointerUp={() => hold("s", false)} onPointerLeave={() => hold("s", false)} onPointerCancel={() => hold("s", false)} onLostPointerCapture={() => hold("s", false)}>▼</button>
+        <button className="mob-move mob-right" aria-label="Sağa git" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("d", true); }} onPointerUp={() => hold("d", false)} onPointerLeave={() => hold("d", false)} onPointerCancel={() => hold("d", false)} onLostPointerCapture={() => hold("d", false)}>▶</button>
+      </nav>
       {entered && !locked && <button className="resume" onClick={() => canvasRef.current?.requestPointerLock()?.catch(() => {})}>FARE KONTROLÜNÜ AÇ</button>}
       {!entered && (
         <section className="welcome">
