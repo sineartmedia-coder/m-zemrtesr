@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { buildPalace } from "./palace";
@@ -37,6 +37,9 @@ export default function Home() {
   const mountRef  = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const keys      = useRef(new Set<string>());
+  const mobileAxis = useRef({ forward: 0, strafe: 0 });
+  const joystickKnobRef = useRef<HTMLSpanElement>(null);
+  const joystickPointerId = useRef<number | null>(null);
   const [entered, setEntered] = useState(false);
   const [locked,  setLocked]  = useState(false);
   const [zone,    setZone]    = useState("GİRİŞ");
@@ -59,7 +62,7 @@ export default function Home() {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     const mobileRenderer = window.matchMedia("(pointer: coarse)").matches || window.innerWidth <= 860;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobileRenderer ? 1.25 : 1.6));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobileRenderer ? 1.1 : 1.6));
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -185,10 +188,26 @@ export default function Home() {
 
     // Final room side walls – romantic gold text
     const frMidZ = (finalRoom.zMin + finalRoom.zMax) / 2;
-    addLabel(scene, "SENİ SEVİYORUM AŞKIM", finalRoom.xMin + 1.05, 6.0, frMidZ,  Math.PI / 2,  4.5, true);
-    addLabel(scene, "ESRA ♥ MERT",          finalRoom.xMax - 1.05, 6.0, frMidZ, -Math.PI / 2, 4.5, true);
+    addLabel(scene, "SENİ SEVİYORUM AŞKIM", finalRoom.xMin + 1.05, 8.0, frMidZ,  Math.PI / 2, 17.0, true);
+    addLabel(scene, "ESRA ♥ MERT",          finalRoom.xMax - 1.05, 8.0, frMidZ, -Math.PI / 2, 15.0, true);
 
 
+
+    // Mobile devices only shade the nearby lights. The lit room and the approach
+    // to it remain unchanged, while distant galleries no longer cost GPU time.
+    const mobileLights: (THREE.PointLight | THREE.SpotLight)[] = [];
+    if (mobileRenderer) {
+      scene.traverse((object) => {
+        if (object instanceof THREE.PointLight || object instanceof THREE.SpotLight) mobileLights.push(object);
+      });
+    }
+    const updateMobileLights = () => {
+      const maxDistanceSq = 24 * 24;
+      mobileLights.forEach((light) => {
+        light.visible = light.position.distanceToSquared(camera.position) <= maxDistanceSq;
+      });
+    };
+    updateMobileLights();
 
     // ── Input & pointer lock ──────────────────────────────────────────────
     let yaw = 0, pitch = 0, touchX = 0, touchY = 0, touching = false;
@@ -228,7 +247,7 @@ export default function Home() {
 
     // ── Animation loop ────────────────────────────────────────────────────
     const clock = new THREE.Clock();
-    let frame = 0, zoneTimer = 0;
+    let frame = 0, zoneTimer = 0, lightTimer = 0;
     const blur = () => keys.current.clear();
     window.addEventListener("blur", blur);
 
@@ -241,9 +260,11 @@ export default function Home() {
         if (keys.current.has("s") || keys.current.has("arrowdown"))  fw -= 1;
         if (keys.current.has("d") || keys.current.has("arrowright")) st += 1;
         if (keys.current.has("a") || keys.current.has("arrowleft"))  st -= 1;
+        fw += mobileAxis.current.forward;
+        st += mobileAxis.current.strafe;
         if (fw || st) {
           const len = Math.hypot(fw, st);
-          const spd = (keys.current.has("shift") ? 10.2 : 7.4) * dt;
+          const spd = (keys.current.has("shift") ? 10.2 : 7.4) * dt * Math.min(1, len);
           const nx = camera.position.x + (-Math.sin(yaw) * fw / len + Math.cos(yaw) * st / len) * spd;
           const nz = camera.position.z + (-Math.cos(yaw) * fw / len - Math.sin(yaw) * st / len) * spd;
           if (isWalkable(nx, camera.position.z)) camera.position.x = nx;
@@ -255,6 +276,8 @@ export default function Home() {
       camera.rotation.x = pitch;
       zoneTimer += dt;
       if (zoneTimer > .35) { zoneTimer = 0; setZone(getZone(camera.position.x, camera.position.z)); }
+      lightTimer += dt;
+      if (lightTimer > .25) { lightTimer = 0; updateMobileLights(); }
       renderer.render(scene, camera);
     };
     // The architecture is static, so preserve its shadows without recalculating them every frame.
@@ -293,7 +316,36 @@ export default function Home() {
     setEntered(true);
     if (window.matchMedia("(pointer: fine)").matches) canvasRef.current?.requestPointerLock()?.catch(() => {});
   };
-  const hold = (key: string, active: boolean) => active ? keys.current.add(key) : keys.current.delete(key);
+  const resetJoystick = () => {
+    mobileAxis.current = { forward: 0, strafe: 0 };
+    joystickKnobRef.current?.style.setProperty("transform", "translate(-50%, -50%)");
+  };
+  const updateJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const limit = 34;
+    let x = event.clientX - (bounds.left + bounds.width / 2);
+    let y = event.clientY - (bounds.top + bounds.height / 2);
+    const distance = Math.hypot(x, y);
+    if (distance > limit) { x = (x / distance) * limit; y = (y / distance) * limit; }
+    mobileAxis.current = { forward: -y / limit, strafe: x / limit };
+    joystickKnobRef.current?.style.setProperty("transform", `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`);
+  };
+  const startJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    joystickPointerId.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateJoystick(event);
+  };
+  const moveJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerId !== joystickPointerId.current) return;
+    event.preventDefault();
+    updateJoystick(event);
+  };
+  const stopJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerId !== joystickPointerId.current) return;
+    joystickPointerId.current = null;
+    resetJoystick();
+  };
 
   return (
     <main className="museum-game">
@@ -304,10 +356,9 @@ export default function Home() {
       <div className="crosshair"><i /></div>
       <div className="status"><span /> SERGİ AÇIK <b>/</b> 7 GALERİ · 49 ESER</div>
       <div className="key-help"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>HAREKET</span><i /><kbd>⇧</kbd><span>HIZLI YÜRÜ</span><i />FARE<span>BAKIŞ</span></div>
-      <nav className="mobile-controls" aria-label="Hareket kontrolleri">
-        <button className="mob-fwd" aria-label="İleri git" onContextMenu={(event) => event.preventDefault()} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("w", true); }} onPointerUp={() => hold("w", false)} onPointerLeave={() => hold("w", false)} onPointerCancel={() => hold("w", false)}>▲</button>
-        <button className="mob-bwd" aria-label="Geri git" onContextMenu={(event) => event.preventDefault()} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); hold("s", true); }} onPointerUp={() => hold("s", false)} onPointerLeave={() => hold("s", false)} onPointerCancel={() => hold("s", false)}>▼</button>
-      </nav>
+      <div className="mobile-controls" role="group" aria-label="Hareket joystick'i" onContextMenu={(event) => event.preventDefault()} onPointerDown={startJoystick} onPointerMove={moveJoystick} onPointerUp={stopJoystick} onPointerCancel={stopJoystick} onLostPointerCapture={resetJoystick}>
+        <span ref={joystickKnobRef} className="joystick-knob" />
+      </div>
       {entered && !locked && <button className="resume" onClick={() => canvasRef.current?.requestPointerLock()?.catch(() => {})}>FARE KONTROLÜNÜ AÇ</button>}
       {!entered && (
         <section className="welcome">
@@ -890,21 +941,30 @@ function addRope(scene: THREE.Scene, x: number, z: number, width: number, ry: nu
 // ─── Label (3D canvas sign) ───────────────────────────────────────────────────
 function addLabel(scene: THREE.Scene, text: string, x: number, y: number, z: number, ry: number, width: number, goldStyle = false) {
   const canvas = document.createElement("canvas");
-  canvas.width = 1024; canvas.height = 220;
+  canvas.width = goldStyle ? 1600 : 1024;
+  canvas.height = goldStyle ? 440 : 220;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   if (goldStyle) {
-    // Transparent background, large gold text with glow
-    ctx.clearRect(0, 0, 1024, 220);
-    ctx.shadowColor = "#ffd700";
-    ctx.shadowBlur = 28;
-    ctx.fillStyle = "#ffd700";
-    ctx.font = "bold 68px Georgia, serif";
+    // A large, luminous gold inscription that feels painted into the wall.
+    const textSize = text.length > 16 ? 118 : 154;
+    const goldGradient = ctx.createLinearGradient(0, 0, 0, 440);
+    goldGradient.addColorStop(0, "#fff3bd");
+    goldGradient.addColorStop(.42, "#e7bd62");
+    goldGradient.addColorStop(1, "#9f6424");
+    ctx.clearRect(0, 0, 1600, 440);
+    ctx.font = `700 ${textSize}px Georgia, serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(text, 512, 112);
-    // Second pass for stronger glow
-    ctx.shadowBlur = 14;
-    ctx.fillText(text, 512, 112);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#5e3515";
+    ctx.shadowColor = "rgba(255, 204, 93, .82)";
+    ctx.shadowBlur = 34;
+    ctx.strokeText(text, 800, 224);
+    ctx.fillStyle = goldGradient;
+    ctx.fillText(text, 800, 224);
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "rgba(255, 245, 194, .56)";
+    ctx.fillText(text, 800, 217);
   } else {
     ctx.fillStyle = "rgba(20,16,12,.93)";
     ctx.fillRect(0, 0, 1024, 220);
@@ -918,7 +978,7 @@ function addLabel(scene: THREE.Scene, text: string, x: number, y: number, z: num
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sign = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, width / 4.65),
+    new THREE.PlaneGeometry(width, width / (goldStyle ? 3.64 : 4.65)),
     new THREE.MeshBasicMaterial({ map: texture, transparent: true })
   );
   sign.position.set(x, y, z);
